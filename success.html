@@ -1,0 +1,31 @@
+<!DOCTYPE html> <!-- Declare modern HTML5 so browsers render consistently -->
+<html lang="en"> <!-- Set language to English for accessibility/screen readers -->
+<head> <!-- Head = metadata, title, styles that load before content -->
+  <meta charset="UTF-8" /> <!-- Ensure all characters render correctly -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" /> <!-- Make layout responsive on mobile -->
+  <title>Password updated</title> <!-- Browser tab title users will see -->
+
+  <style>
+    /* Lightweight, inline styles so we don’t need a separate CSS file */
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; min-height: 100dvh; display: grid; place-items: center; background: #fff; } /* Center the card on the page */
+    .card { max-width: 520px; width: 100%; padding: 1.25rem; border-radius: 14px; box-shadow: 0 6px 24px rgba(0,0,0,0.12); } /* Simple elevated container */
+    h1 { margin: 0 0 0.5rem; font-size: 1.25rem; } /* Clean page title */
+    p { margin: 0.25rem 0 1rem; color: #333; } /* Subtle paragraph styling */
+    a.button { display: inline-block; padding: 0.8rem 1rem; border-radius: 10px; text-decoration: none; font-weight: 700; } /* Reusable button link */
+    .primary { background: #0ea5e9; color: #fff; } /* Primary action color */
+    .secondary { margin-left: 0.5rem; } /* Spacing for secondary action */
+  </style>
+</head>
+<body> <!-- Visible content starts here -->
+  <div class="card"> <!-- Visual container -->
+    <h1>Password updated ✅</h1> <!-- Clear success message -->
+    <p>Your password has been changed successfully.</p> <!-- Reassurance text -->
+
+    <!-- Primary action: take users back to sign-in (adjust destination as you like) -->
+    <a class="button primary" href="https://hazfkudticoqhtoobvpu.supabase.co/auth/signin">Sign in</a> <!-- Direct them to sign-in on your auth page or your app’s login page -->
+
+    <!-- Optional: link back to your site/app homepage -->
+    <a class="button secondary" href="https://heberj.github.io/web-reset/">Back</a> <!-- Secondary navigation in case they need it -->
+  </div>
+</body>
+</html>
