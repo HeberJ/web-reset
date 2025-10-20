@@ -1,0 +1,107 @@
+<!--
+  start.html
+  PURPOSE: Prevent mail clients (Gmail/Outlook link prefetchers, “safe link” scanners,
+  previews) from *auto-clicking* the Supabase verify URL and expiring the token
+  before the user actually interacts.
+
+  HOW IT WORKS:
+  1) The email button will point to THIS page instead of hitting Supabase directly.
+  2) This page reads ?verify_url=... (the ORIGINAL Supabase ConfirmationURL).
+  3) We render a button. ONLY when a human clicks it do we navigate to verify_url.
+  4) Supabase verifies the token and redirects (via your redirect_to) back to index.html
+     with either ?code=... or #access_token=...&type=recovery, which index.html handles.
+
+  SECURITY:
+  - We do NOT auto-redirect here. Scanners that only fetch the HTML won’t burn the token.
+  - We only redirect on explicit user click.
+-->
+
+<!DOCTYPE html> <!-- HTML5 document -->
+<html lang="en"> <!-- Document language for accessibility -->
+<head> <!-- Head contains metadata and styles -->
+  <meta charset="UTF-8" /> <!-- Ensure proper encoding -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" /> <!-- Mobile-friendly -->
+  <title>Continue to password reset</title> <!-- Tab title -->
+
+  <style>
+    /* Simple, readable styling without external CSS */
+    body { font-family: system-ui,-apple-system,Segoe UI,Roboto,sans-serif; margin: 0; min-height: 100dvh; display: grid; place-items: center; background: #fff; }
+    .card { max-width: 560px; width: 100%; padding: 1.25rem; border-radius: 14px; box-shadow: 0 6px 24px rgba(0,0,0,0.12); }
+    h1 { margin: 0 0 0.5rem; font-size: 1.25rem; }
+    p { margin: 0.25rem 0 1rem; color: #333; }
+    button { padding: 0.9rem 1rem; border: 0; border-radius: 10px; font-weight: 700; cursor: pointer; width: 100%; }
+    .warn { color: #a00; font-size: 0.95rem; }
+    .small { font-size: 0.9rem; color: #555; }
+    .hidden { display: none; }
+    input { width: 100%; padding: 0.6rem; border: 1px solid #ccc; border-radius: 10px; }
+    .row { display: grid; gap: 0.5rem; }
+  </style>
+</head>
+<body> <!-- Visible content -->
+  <div class="card">
+    <h1>Continue to password reset</h1>
+    <p id="status" class="small">For security, click the button below to continue.</p>
+
+    <!-- We show the domain of the destination so users trust the next hop -->
+    <p id="dest" class="small"></p>
+
+    <!-- Primary action: requires an explicit human click -->
+    <button id="continueBtn">Continue</button>
+
+    <!-- Fallback if the verify_url is missing or malformed (very rare) -->
+    <div id="fallback" class="hidden">
+      <p class="warn">This link seems incomplete.</p>
+      <p class="small">If you copied the link manually, make sure it includes <code>?verify_url=…</code>. You can always request a new reset email.</p>
+    </div>
+  </div>
+
+  <script>
+    // -----------------------------
+    // 1) Read the original verify URL (Supabase ConfirmationURL) from query string
+    //    Example of THIS page’s URL from the email template:
+    //    https://heberj.github.io/web-reset/start.html?verify_url=<urlencoded ConfirmationURL>
+    // -----------------------------
+    const params = new URLSearchParams(window.location.search);          // parse ?query=...
+    const rawVerifyUrl = params.get("verify_url");                       // original Supabase verify URL (URL-encoded)
+    const statusEl = document.getElementById("status");                  // status text element
+    const destEl = document.getElementById("dest");                      // shows the destination host for transparency
+    const btn = document.getElementById("continueBtn");                  // continue button
+    const fallback = document.getElementById("fallback");                // fallback block if missing param
+
+    // Attempt to safely decode the verify URL
+    let verifyUrl = null;                                                // will hold the decoded full URL string
+    try {
+      verifyUrl = rawVerifyUrl ? decodeURIComponent(rawVerifyUrl) : null; // decode %xx sequences
+    } catch (e) {
+      verifyUrl = null;                                                  // if decoding fails, act as missing
+    }
+
+    // -----------------------------
+    // 2) Validate and preview destination to the user
+    // -----------------------------
+    if (!verifyUrl) {                                                    // if parameter is missing/bad
+      statusEl.textContent = "Missing verification link. Please request a new password reset email.";
+      btn.classList.add("hidden");                                       // hide button; we can’t continue
+      fallback.classList.remove("hidden");                               // show guidance
+    } else {
+      try {
+        const u = new URL(verifyUrl);                                    // parse to inspect host
+        // Show where we’ll send them (should be your Supabase project host)
+        destEl.textContent = `Next: ${u.origin}${u.pathname}`;           // e.g., https://hazfkudticoqhtoobvpu.supabase.co/auth/v1/verify
+      } catch {
+        destEl.textContent = "";                                         // if parsing fails, don’t show destination
+      }
+    }
+
+    // -----------------------------
+    // 3) Only on human click do we navigate to Supabase verify URL
+    //    This avoids background prefetchers burning the token.
+    // -----------------------------
+    btn.addEventListener("click", () => {
+      if (!verifyUrl) return;                                            // guard; nothing to do
+      statusEl.textContent = "Taking you to verification…";              // feedback
+      window.location.assign(verifyUrl);                                 // real navigation to Supabase /verify
+    });
+  </script>
+</body>
+</html>
