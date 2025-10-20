@@ -15,107 +15,100 @@
     Load Supabase JS from a CDN (official ESM build).
     This gives us the `createClient` function in a module context below.
   -->
-  <script type="module">
-    // -----------------------------
-    // 1) CONFIGURE SUPABASE CLIENT
-    // -----------------------------
+ <script type="module">
+  // --- 0) Import Supabase client (ESM build) ---
+  import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-    // Import the ESM build of Supabase JS directly from the CDN at runtime.
-    import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+  // --- 1) YOUR PROJECT CREDENTIALS (leave as you set them earlier) ---
+  const SUPABASE_URL = "https://hazfkudticoqhtoobvpu.supabase.co";   // ← your project URL
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhhemZrdWR0aWNvcWh0b29idnB1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg5OTc1ODcsImV4cCI6MjA3NDU3MzU4N30.QsOwyZXGOWrAv5Aj_gL0II3B970ocebhCCKeK4BgMUw";                 // ← your anon public key
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);     // builds a browser client
 
-  
-    const SUPABASE_URL = "https://hazfkudticoqhtoobvpu.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhhemZrdWR0aWNvcWh0b29idnB1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg5OTc1ODcsImV4cCI6MjA3NDU3MzU4N30.QsOwyZXGOWrAv5Aj_gL0II3B970ocebhCCKeK4BgMUw"; // Public anon key; safe to expose in client apps
+  // --- 2) Grabbing DOM elements we’ll update ---
+  const statusEl = document.getElementById("status");     // shows status/errors
+  const formEl = document.getElementById("reset-form");   // new-password form
+  const pass1El = document.getElementById("password");    // new password
+  const pass2El = document.getElementById("password2");   // confirm password
+  const submitEl = document.getElementById("submit-btn"); // submit button
 
-    // Create a Supabase browser client; used to exchange the auth code and update password.
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  // --- 3) Parse both possible URL formats from Supabase ---
+  const url = new URL(window.location.href);              // full current URL
+  const authCode = url.searchParams.get("code");          // ?code=XYZ style (PKCE)
+  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, "")); // #access_token=… style
+  const hashAccessToken = hashParams.get("access_token"); // token from hash
+  const hashRefreshToken = hashParams.get("refresh_token");
+  const hashType = hashParams.get("type");                // should be "recovery" for PW reset
 
-    // ----------------------------------------
-    // 2) PARSE AUTH CODE FROM THE BROWSER URL
-    // ----------------------------------------
-    // Supabase authentication links (including password recovery) arrive here with a short-lived `code` query param.
-    // Example: https://your-reset-page.xyz/?code=XYZ&redirect_to=...
-    const url = new URL(window.location.href);     // Grab the full current URL in the browser
-    const authCode = url.searchParams.get("code"); // Extract the `code` parameter for PKCE exchange
-
-    // Here we find references to DOM elements we will update as the user proceeds.
-    const statusEl = document.getElementById("status");      // A simple text area to show status/errors
-    const formEl = document.getElementById("reset-form");    // The password entry form
-    const pass1El = document.getElementById("password");     // First password field
-    const pass2El = document.getElementById("password2");    // Confirm password field
-    const submitEl = document.getElementById("submit-btn");  // Submit button
-
-    // ------------------------------------
-    // 3) EXCHANGE CODE → ESTABLISH SESSION
-    // ------------------------------------
-    // On load, if we have an auth code, exchange it for a session so the user is authenticated in this tab.
-    // This is REQUIRED before calling `updateUser({ password })`.
-    async function ensureSessionFromCode() {
-      // If the email link didn’t include `code`, bail with a helpful message.
-      if (!authCode) {
-        statusEl.textContent = "Missing 'code' in URL. Open this page from your email reset link.";
-        formEl.style.display = "none"; // Hide the form because we can’t proceed without a session
-        return;
-      }
-
-      // Try the PKCE exchange one time on page load. If the session already exists, Supabase will no-op.
+  // --- 4) Try to establish a session, supporting both formats ---
+  async function establishSession() {
+    // 4a) New-style links: https://site/reset?code=XYZ
+    if (authCode) {
       const { error } = await supabase.auth.exchangeCodeForSession({ authCode });
-
-      // If there’s an error, show it and disable the form.
       if (error) {
         statusEl.textContent = `Could not start reset session: ${error.message}`;
         formEl.style.display = "none";
         return;
       }
-
-      // Success: session established. The user can now set a new password.
       statusEl.textContent = "Session verified. Enter your new password below.";
-      formEl.style.display = "block"; // Reveal the form
+      formEl.style.display = "block";
+      return;
     }
 
-    // -------------------------------------------------
-    // 4) HANDLE SUBMIT → UPDATE PASSWORD VIA SUPABASE
-    // -------------------------------------------------
-    formEl.addEventListener("submit", async (e) => {
-      e.preventDefault(); // Prevent the browser from reloading on form submit
-
-      // Read password values from the inputs.
-      const p1 = pass1El.value; // First entry for the new password
-      const p2 = pass2El.value; // Confirmation entry for the new password
-
-      // Simple client-side validations before calling Supabase.
-      if (!p1 || p1.length < 8) { // You can raise the bar per your policy (e.g., min 12 chars)
-        statusEl.textContent = "Password must be at least 8 characters.";
-        return;
-      }
-      if (p1 !== p2) { // Confirm that both entries match
-        statusEl.textContent = "Passwords do not match.";
-        return;
-      }
-
-      // Disable the button while we call Supabase to prevent double-submits.
-      submitEl.disabled = true;
-      statusEl.textContent = "Updating password…";
-
-      // Call Supabase to update the authenticated user’s password in this session.
-      const { error } = await supabase.auth.updateUser({ password: p1 });
-
-      // Re-enable the button regardless of outcome.
-      submitEl.disabled = false;
-
-      // Show the result to the user.
+    // 4b) Legacy/redirect links: https://site/reset/#access_token=…&refresh_token=…&type=recovery
+    if (hashAccessToken && hashRefreshToken && hashType === "recovery") {
+      const { data, error } = await supabase.auth.setSession({
+        access_token: hashAccessToken,
+        refresh_token: hashRefreshToken,
+      });
       if (error) {
-        statusEl.textContent = `Error: ${error.message}`;
-      } else {
-        statusEl.textContent = "Password updated successfully. You may now close this tab and sign in.";
-        // Optionally, you can redirect them to a sign-in page on your site:
-        // window.location.href = "/sign-in";
+        statusEl.textContent = `Could not restore session: ${error.message}`;
+        formEl.style.display = "none";
+        return;
       }
-    });
+      statusEl.textContent = "Session verified. Enter your new password below.";
+      formEl.style.display = "block";
+      return;
+    }
 
-    // Kick off the session exchange when the page loads.
-    ensureSessionFromCode(); // Run immediately on page load
-  </script>
+    // 4c) Neither format was present → user didn’t arrive from a reset email
+    statusEl.textContent = "Missing 'code' in URL. Open this page from your email reset link.";
+    formEl.style.display = "none";
+  }
+
+  // --- 5) Submit handler: update password once session exists ---
+  formEl.addEventListener("submit", async (e) => {
+    e.preventDefault();                             // don’t reload the page
+    const p1 = pass1El.value;                       // read new password
+    const p2 = pass2El.value;                       // read confirmation
+
+    if (!p1 || p1.length < 8) {                     // basic policy check
+      statusEl.textContent = "Password must be at least 8 characters.";
+      return;
+    }
+    if (p1 !== p2) {                                // both entries must match
+      statusEl.textContent = "Passwords do not match.";
+      return;
+    }
+
+    submitEl.disabled = true;                       // prevent double submit
+    statusEl.textContent = "Updating password…";    // optimistic status
+
+    const { error } = await supabase.auth.updateUser({ password: p1 }); // call Supabase
+    submitEl.disabled = false;                      // re-enable button
+
+    if (error) {
+      statusEl.textContent = `Error: ${error.message}`; // surface any errors
+      return;
+    }
+    statusEl.textContent = "Password updated successfully. You may now close this tab and sign in.";
+    // Optional: redirect after success
+    // window.location.href = "https://heberj.github.io/web-reset/success.html";
+  });
+
+  // --- 6) Kick off the session establishment on page load ---
+  establishSession();                               // handles both URL styles
+</script>
+
 
   <!-- Very light, inline styles for a clean, centered form without external CSS -->
   <style>
