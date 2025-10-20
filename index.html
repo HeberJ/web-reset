@@ -101,13 +101,29 @@
       statusEl.textContent = `Error: ${error.message}`; // surface any errors
       return;
     }
-    statusEl.textContent = "Password updated successfully. You may now close this tab and sign in.";
-    // Optional: redirect after success
-    // window.location.href = "https://heberj.github.io/web-reset/success.html";
-  });
+    statusEl.textContent = "Password updated successfully. Redirecting…"; // brief confirmation message
+    setTimeout(() => {                                 // wait a moment so the user sees the message
+      window.location.assign("success.html");          // take the user to your success page
+    }, 800);                                           // 0.8s delay feels snappy but readable
 
   // --- 6) Kick off the session establishment on page load ---
   establishSession();                               // handles both URL styles
+
+  // --- 7) Password visibility toggle functionality ---
+  document.querySelectorAll('.toggle-password').forEach(button => {
+    button.addEventListener('click', function() {
+      const targetId = this.getAttribute('data-target');
+      const input = document.getElementById(targetId);
+
+      if (input.type === 'password') {
+        input.type = 'text';
+        this.textContent = 'Hide';
+      } else {
+        input.type = 'password';
+        this.textContent = 'Show';
+      }
+    });
+  });
 </script>
 
 
@@ -152,9 +168,13 @@
     label:first-of-type {
       margin-top: 0;
     }
+    .input-wrapper {
+      position: relative;
+      width: 100%;
+    }
     input {
       width: 100%;
-      padding: 0.75rem;
+      padding: 0.75rem 3rem 0.75rem 1rem;
       border-radius: 8px;
       border: 1px solid #d1d5db;
       font-size: 1rem;
@@ -185,6 +205,25 @@
       opacity: 0.6;
       cursor: not-allowed;
     }
+    .toggle-password {
+      position: absolute;
+      right: 0.75rem;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0.5rem;
+      color: #6b7280;
+      font-size: 0.875rem;
+      font-weight: 500;
+      transition: color 0.2s;
+      width: auto;
+      margin: 0;
+    }
+    .toggle-password:hover {
+      color: #3b82f6;
+    }
   </style>
 </head>
 <body> <!-- Body contains visible content and the form markup -->
@@ -195,10 +234,16 @@
     <!-- Hidden by default; becomes visible after the auth code is successfully exchanged -->
     <form id="reset-form" style="display:none;">
       <label for="password">New password</label> <!-- Label for the first password input -->
-      <input id="password" type="password" autocomplete="new-password" required /> <!-- First password field -->
+      <div class="input-wrapper">
+        <input id="password" type="password" autocomplete="new-password" required /> <!-- First password field -->
+        <button type="button" class="toggle-password" data-target="password">Show</button>
+      </div>
 
       <label for="password2">Confirm new password</label> <!-- Label for the confirm password input -->
-      <input id="password2" type="password" autocomplete="new-password" required /> <!-- Confirmation field -->
+      <div class="input-wrapper">
+        <input id="password2" type="password" autocomplete="new-password" required /> <!-- Confirmation field -->
+        <button type="button" class="toggle-password" data-target="password2">Show</button>
+      </div>
 
       <button id="submit-btn" type="submit">Update password</button> <!-- Submit button to trigger updateUser -->
     </form>
