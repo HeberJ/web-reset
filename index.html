@@ -101,10 +101,11 @@
       statusEl.textContent = `Error: ${error.message}`; // surface any errors
       return;
     }
-    statusEl.textContent = "Password updated successfully. Redirecting…"; // brief confirmation message
-    setTimeout(() => {                                 // wait a moment so the user sees the message
-      window.location.assign("success.html");          // take the user to your success page
-    }, 800);                                           // 0.8s delay feels snappy but readable
+    statusEl.textContent ="Password updated successfully. Redirecting…";
+    setTimeout(() => {
+      window.location.href = "https://heberj.github.io/web-reset/success.html";
+    }, 800);
+  });
 
   // --- 6) Kick off the session establishment on page load ---
   establishSession();                               // handles both URL styles
