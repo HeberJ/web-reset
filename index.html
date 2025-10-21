@@ -31,6 +31,14 @@
   const pass1El = document.getElementById("password");    // new password
   const pass2El = document.getElementById("password2");   // confirm password
   const submitEl = document.getElementById("submit-btn"); // submit button
+  // Grab the checklist items we added earlier so we can toggle them on/off.
+  const ruleItems = document.querySelectorAll("#pw-rules .req");           // selects every <li class="req"> inside the #pw-rules list
+  // Build a map from data-rule attribute -> element for quick access.
+  const rulesMap = Array.from(ruleItems).reduce((acc, li) => {             // convert NodeList to array and iterate each <li>
+    acc[li.dataset.rule] = li;                                             // use the data-rule value (e.g., "len","lower") as the key, and store the element
+    return acc;                                                            // return the accumulator on each iteration
+  }, {});                                                                  // start with an empty object
+
 
   // --- 3) Parse both possible URL formats from Supabase ---
   const url = new URL(window.location.href);              // full current URL
@@ -125,6 +133,56 @@
       }
     });
   });
+  // --- 8) Real-time password strength validation ---
+  // Define the actual checks your Supabase policy requires (min 8 + lower + upper + digit + symbol).
+  function evaluatePasswordRules(pw) {                                     // function that returns an object of booleans for each rule
+    return {
+      len: pw.length >= 8,                                                 // true when at least 8 characters long
+      lower: /[a-z]/.test(pw),                                             // true when it contains a lowercase letter a–z
+      upper: /[A-Z]/.test(pw),                                             // true when it contains an uppercase letter A–Z
+      digit: /\d/.test(pw),                                                // true when it contains a digit 0–9
+      symbol: /[^A-Za-z0-9]/.test(pw),                                     // true when it contains any non-alphanumeric symbol
+    };                                                                     // the object mirrors the data-rule attributes on your <li> elements
+  }
+
+  // Update the UI (green/bold) for each checklist line item.
+  function renderRuleStates(states) {                                      // accepts the object returned by evaluatePasswordRules
+    Object.entries(states).forEach(([key, ok]) => {                        // loop each rule: key is "len"/"lower"/..., ok is boolean
+      const li = rulesMap[key];                                            // find the corresponding <li> by the same key
+      if (!li) return;                                                     // safety guard: skip if no matching element (shouldn't happen)
+      li.classList.toggle("ok", ok);                                       // add class "ok" when true (turns green/bold), remove when false
+    });                                                                    // finished updating all lines
+  }
+
+  // Determine whether the form can be submitted right now.
+  function canSubmitNow() {                                                // returns true only when all rules pass AND both fields match
+    const pw = pass1El.value || "";                                        // read the first password field (empty string if null)
+    const pw2 = pass2El.value || "";                                       // read the confirm password field
+    const states = evaluatePasswordRules(pw);                              // compute current rule booleans for pw
+    const allRulesPass = Object.values(states).every(Boolean);             // true only if every rule boolean is true
+    const matches = pw.length > 0 && pw === pw2;                           // both fields must be non-empty and identical
+    renderRuleStates(states);                                              // reflect rule state in the checklist UI
+    return allRulesPass && matches;                                        // only allow submit when rules pass and passwords match
+  }
+
+  // Recompute on every keystroke in either password field.
+  function onPasswordInput() {                                             // event handler to run on each input change
+    const okToSubmit = canSubmitNow();                                     // ask whether we meet all conditions
+    submitEl.disabled = !okToSubmit;                                       // enable the button if true; disable if false
+    if (!okToSubmit) {                                                     // when not ready, provide a gentle hint
+      statusEl.textContent = "Enter a strong password and make sure both fields match."; // guidance text
+    } else {                                                               // when ready, clear status so the button feels actionable
+      statusEl.textContent = "Looks good — you can update your password."; // positive confirmation
+    }
+  }
+
+  // Attach the real-time listeners (fires on each keystroke).
+  pass1El.addEventListener("input", onPasswordInput);                      // validate as the user types in the first field
+  pass2El.addEventListener("input", onPasswordInput);                      // validate as the user types in the confirmation field
+
+  // Run once on load in case the browser autofills saved values.
+  onPasswordInput();                                                       // initializes the checklist and button state immediately
+
 </script>
 
 
@@ -225,6 +283,9 @@
     .toggle-password:hover {
       color: #3b82f6;
     }
+    /* Visual state for each requirement line */
+    .req { color:#6b7280; }               /* default = gray text until the rule passes */
+    .req.ok { color:#059669; font-weight:600; } /* when a rule is satisfied, turn green + bold */
   </style>
 </head>
 <body> <!-- Body contains visible content and the form markup -->
@@ -237,6 +298,14 @@
       <label for="password">New password</label> <!-- Label for the first password input -->
       <div class="input-wrapper">
         <input id="password" type="password" autocomplete="new-password" required /> <!-- First password field -->
+        <!-- Password requirements checklist shown to the user -->
+        <ul id="pw-rules" style="margin:0.5rem 0 0; padding-left:1.25rem;"> <!-- unordered list to display each rule -->
+          <li class="req" data-rule="len">At least 8 characters</li>          <!-- rule: minimum length -->
+          <li class="req" data-rule="lower">Contains a lowercase letter (a–z)</li> <!-- rule: lowercase -->
+          <li class="req" data-rule="upper">Contains an uppercase letter (A–Z)</li> <!-- rule: uppercase -->
+          <li class="req" data-rule="digit">Contains a digit (0–9)</li>            <!-- rule: number -->
+          <li class="req" data-rule="symbol">Contains a symbol (!@#$…)</li>        <!-- rule: symbol -->
+        </ul>
         <button type="button" class="toggle-password" data-target="password">Show</button>
       </div>
 
