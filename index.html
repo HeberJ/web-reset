@@ -328,16 +328,16 @@
       <label for="password">New password</label> <!-- Label for the first password input -->
       <div class="input-wrapper">
         <input id="password" type="password" autocomplete="new-password" required /> <!-- First password field -->
-        <!-- Password requirements checklist shown to the user -->
-        <ul id="pw-rules" style="margin:0.5rem 0 0; padding-left:1.25rem;"> <!-- unordered list to display each rule -->
+        <button type="button" class="toggle-password" data-target="password">Show</button>
+      </div>
+      <!-- Password requirements checklist shown to the user -->
+      <ul id="pw-rules" style="margin:0.5rem 0 0; padding-left:1.25rem;"> <!-- unordered list to display each rule -->
           <li class="req" data-rule="len">At least 8 characters</li>          <!-- rule: minimum length -->
           <li class="req" data-rule="lower">Contains a lowercase letter (a–z)</li> <!-- rule: lowercase -->
           <li class="req" data-rule="upper">Contains an uppercase letter (A–Z)</li> <!-- rule: uppercase -->
           <li class="req" data-rule="digit">Contains a digit (0–9)</li>            <!-- rule: number -->
           <li class="req" data-rule="symbol">Contains a symbol (!@#$…)</li>        <!-- rule: symbol -->
-        </ul>
-        <button type="button" class="toggle-password" data-target="password">Show</button>
-      </div>
+      </ul>
 
       <label for="password2">Confirm new password</label> <!-- Label for the confirm password input -->
       <div class="input-wrapper">
@@ -350,3 +350,4 @@
   </div>
 </body>
 </html>
+
