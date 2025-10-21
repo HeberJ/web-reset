@@ -85,35 +85,65 @@
   }
 
   // --- 5) Submit handler: update password once session exists ---
-  formEl.addEventListener("submit", async (e) => {
-    e.preventDefault();                             // don’t reload the page
-    const p1 = pass1El.value;                       // read new password
-    const p2 = pass2El.value;                       // read confirmation
+  // --- Submit handler: final validation + submit hardening ---
+  let submitting = false;                                                    // global flag to prevent double-submits
 
-    if (!p1 || p1.length < 8) {                     // basic policy check
-      statusEl.textContent = "Password must be at least 8 characters.";
-      return;
+  formEl.addEventListener("submit", async (e) => {                           // listen for the form's submit event
+    e.preventDefault();                                                      // stop the browser from reloading the page
+
+    if (submitting) return;                                                  // if already submitting, ignore additional clicks
+    submitting = true;                                                       // set the in-flight lock to true immediately
+
+    try {                                                                    // begin guarded try/catch block to surface any runtime errors
+      const pw = pass1El.value || "";                                        // read the first password field (fallback to empty string)
+      const pw2 = pass2El.value || "";                                       // read the confirmation field
+
+      // 1) Re-run full validation at submit time to catch paste/autofill edge cases.
+      const states = evaluatePasswordRules(pw);                              // compute all rule booleans for the entered password
+      const allRulesPass = Object.values(states).every(Boolean);             // true only if every rule is satisfied
+      const matches = pw.length > 0 && pw === pw2;                           // ensure both fields are non-empty and identical
+
+      renderRuleStates(states);                                              // reflect the latest rule states in the checklist UI
+
+      if (!allRulesPass) {                                                   // if any rule is unmet, explain and stop
+        statusEl.textContent = "Please meet all password requirements before submitting."; // user-facing guidance
+        submitEl.disabled = true;                                            // keep button disabled until they fix inputs
+        return;                                                              // exit early due to rule failure
+      }
+
+      if (!matches) {                                                        // if the two fields do not match, explain and stop
+        statusEl.textContent = "Passwords do not match.";                    // specific mismatch message
+        submitEl.disabled = true;                                            // require correction before re-enabling submit
+        return;                                                              // exit early due to mismatch
+      }
+
+      // 2) Disable the button while the network request is in-flight.
+      submitEl.disabled = true;                                              // prevents accidental double-clicks
+      statusEl.textContent = "Updating password…";                           // optimistic progress feedback
+
+      // 3) Call Supabase to update the password on the authenticated recovery session.
+      const { error } = await supabase.auth.updateUser({ password: pw });    // perform the password update via Supabase
+
+      if (error) {                                                           // if Supabase returned an error, surface it to the user
+        statusEl.textContent = `Error: ${error.message}`;                    // show the exact error message
+        submitEl.disabled = false;                                           // allow the user to try again after fixing input
+        return;                                                              // stop here on failure
+      }
+
+      // 4) Success → brief confirmation, then redirect to your success page.
+      statusEl.textContent = "Password updated successfully. Redirecting…";  // success message to reassure the user
+      setTimeout(() => {                                                     // short delay so the user can read the message
+        window.location.assign("success.html");                              // navigate to the success page you created
+      }, 800);                                                               // ~0.8s feels responsive yet readable
+
+    } catch (err) {                                                          // catch any unexpected runtime errors
+      statusEl.textContent = `Unexpected error: ${String(err)}`;             // show a generic but informative message
+      submitEl.disabled = false;                                             // re-enable the button so the user can retry
+    } finally {                                                              // always run, success or failure
+      submitting = false;                                                    // release the in-flight lock so future submits are allowed
     }
-    if (p1 !== p2) {                                // both entries must match
-      statusEl.textContent = "Passwords do not match.";
-      return;
-    }
-
-    submitEl.disabled = true;                       // prevent double submit
-    statusEl.textContent = "Updating password…";    // optimistic status
-
-    const { error } = await supabase.auth.updateUser({ password: p1 }); // call Supabase
-    submitEl.disabled = false;                      // re-enable button
-
-    if (error) {
-      statusEl.textContent = `Error: ${error.message}`; // surface any errors
-      return;
-    }
-    statusEl.textContent ="Password updated successfully. Redirecting…";
-    setTimeout(() => {
-      window.location.assign("success.html"); 
-    }, 800);
   });
+
 
   // --- 6) Kick off the session establishment on page load ---
   establishSession();                               // handles both URL styles
