@@ -64,20 +64,36 @@
     }
 
     // 4b) Legacy/redirect links: https://site/reset/#access_token=…&refresh_token=…&type=recovery
-    if (hashAccessToken && hashRefreshToken && hashType === "recovery") {
-      const { data, error } = await supabase.auth.setSession({
-        access_token: hashAccessToken,
-        refresh_token: hashRefreshToken,
+        // 4b) Legacy/redirect links:
+    //     Password reset typically comes as: #access_token=…&refresh_token=…&type=recovery
+    //     Invite user typically comes as:     #access_token=…&refresh_token=…&type=invite
+    //     So we accept ANY type as long as we got valid tokens.
+    if (hashAccessToken && hashRefreshToken) {                               // only requirement: we have both tokens
+      const { data, error } = await supabase.auth.setSession({               // create a Supabase session from the tokens
+        access_token: hashAccessToken,                                       // token that proves the user is authenticated for this flow
+        refresh_token: hashRefreshToken,                                     // token that lets Supabase refresh the session if needed
       });
-      if (error) {
-        statusEl.textContent = `Could not restore session: ${error.message}`;
-        formEl.style.display = "none";
-        return;
+
+      if (error) {                                                          // if session creation failed
+        statusEl.textContent = `Could not restore session: ${error.message}`;// show the exact error
+        formEl.style.display = "none";                                      // hide the form because we can’t proceed
+        return;                                                             // stop here
       }
-      statusEl.textContent = "Session verified. Enter your new password below.";
-      formEl.style.display = "block";
-      return;
+
+      // Show a friendly message depending on what Supabase says the flow is.
+      // (If hashType is missing, we still allow it — tokens are what matter.)
+      if (hashType === "invite") {                                          // invite flow
+        statusEl.textContent = "Invite verified. Set your password to finish creating your account.";
+      } else if (hashType === "recovery") {                                 // password reset flow
+        statusEl.textContent = "Session verified. Enter your new password below.";
+      } else {                                                              // any other flow type (still valid if tokens exist)
+        statusEl.textContent = "Session verified. Set your password to continue.";
+      }
+
+      formEl.style.display = "block";                                       // show the password form
+      return;                                                               // stop after showing the form
     }
+
 
     // 4c) Neither format was present → user didn’t arrive from a reset email
     statusEl.textContent = "Missing 'code' in URL. Open this page from your email reset link.";
